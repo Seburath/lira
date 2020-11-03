@@ -1,7 +1,8 @@
 from prompt_toolkit.application import Application
 from prompt_toolkit.formatted_text import merge_formatted_text, to_formatted_text
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.layout.containers import HSplit, VSplit, Window
+from functools import partial
+from prompt_toolkit.layout.containers import HSplit, VSplit, Window, to_container
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.widgets import Label, TextArea
 
@@ -47,7 +48,7 @@ class Menu:
     def __init__(self, lira):
         self.tutorial = Tutorial()
 
-        self.selection =  lira
+        self.lira =  lira
         self.items = self.get_nested_items()
 
         self.buttons = self.get_buttons()
@@ -62,8 +63,8 @@ class Menu:
         """Return the list of items nested on the current menu item"""
         nested_items = []
 
-        self.selection.books[0].parse()
-        chapter = self.selection.books[0].chapters[0]
+        self.lira.books[0].parse()
+        chapter = self.lira.books[0].chapters[0]
         chapter.parse()
         self.contents = chapter.contents[1]
 
@@ -75,23 +76,21 @@ class Menu:
         return nested_items
 
 
-    def refresh_buttons(self):
-        render = self.tutorial.get_label(self.contents)
-        label = Label(merge_formatted_text(render))
-        self.tutorial.label = label
-
-        self.tutorial.refresh(str(self.tutorial.label))
-
-        self.items = self.get_nested_items()
-        self.buttons = self.get_buttons()
+    def select_section(self, section_name):
+        app = get_app()
+        vsplit = app.layout.container.get_children()[0]
+        content = vsplit.get_children()[2]
+        content.children = [
+            to_container(Box(height=20, width=80,  body=Label(section_name), padding=1, style="class:right-pane"))
+        ]
 
 
     def get_buttons(self):
         """Return a list of buttons from  a list of items"""
         buttons = []
 
-        for item in self.items:
-            buttons.append(Button(item, handler=self.refresh_buttons))
+        for i, item in enumerate(self.items):
+            buttons.append(Button(f"{i + 1}. {item}", handler=partial(self.select_section, f'Book {item}')))
 
         buttons.append(Button("Exit", handler=exit))
         return buttons
@@ -128,16 +127,6 @@ def get_key_bindings():
     @keys.add("up")
     def _(event):
         focus_previous(event)
-
-    @keys.add("right")
-    def _(event):
-        c2 = HSplit(
-            [
-                Box(height=20, width=80,  body=Frame(Label('asdasdasd')), padding=1, style="class:right-pane"),
-            ]
-        )
-        event.app.layout = Layout(c2)
-        event.app.reset()
 
     @keys.add("c-c")
     @keys.add("c-q")
@@ -179,8 +168,8 @@ sections = {
     ),
     "text": TextArea(height=10, width=40, style=styles["Text"], text="text"),
     "prompt": TextArea(height=10, width=40, style=styles["Prompt"], text=""),
-    "vseparator": Window(height=0, width=1, char="|", style=styles["Separator"]),
-    "hseparator": Window(height=1, char="-", style=styles["Separator"]),
+    "vseparator": Window(height=0, width=1, char="│", style=styles["Separator"]),
+    "hseparator": Window(height=1, char="─", style=styles["Separator"]),
 }
 
 
@@ -243,7 +232,6 @@ class TerminalUI():
             key_bindings=get_key_bindings(),
             mouse_support=True,
             full_screen=True,
-            min_redraw_interval=0.1,
         )
 
         self.app.run()
